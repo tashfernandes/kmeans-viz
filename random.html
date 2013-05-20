@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>K-Means with Random Initialisation Visualisation</title>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <script src="d3.min.js" charset="utf-8"></script>
+    <script>
+/*
+    TODO: 
+      1. Display best cost function at end
+      2. Transition after convergence
+*/
+
+
+      var numPoints = 50;
+      var ranges = [
+        { "x" : {"min": 70, "max": 500},
+          "y" : {"min": 70, "max": 280}
+        },
+        { "x" : {"min": 360, "max": 745},
+          "y" : {"min": 180, "max":403}
+        },
+        { "x" : {"min": 60, "max": 335},
+          "y" : {"min": 145, "max":412}
+        }
+      ]; 
+
+      var numGroups = 3;
+      var colours = [
+        'red', 'blue', 'green', 'yellow', 'purple', 'orange'
+      ];
+
+      // Initialise the data points
+      var data = [];
+      for (var w = 0; w < numGroups; w++) {
+        var xDiff = ranges[w].x.max - ranges[w].x.min;
+        var yDiff = ranges[w].y.max - ranges[w].y.min;
+      
+        for (var i = 0; i < numPoints; i++) {
+          var x = Math.floor(Math.random() * xDiff) + ranges[w].x.min;
+          var y = Math.floor(Math.random() * yDiff) + ranges[w].y.min;
+          elt = { "x" : x, "y": y, "c" : ranges[w].c};
+          data.push(elt);
+        }
+      }
+  
+      var numIterations = 10;
+      var currentIteration = 0;
+
+      // Draw the data points
+      var vis = d3.select("body")
+                .append("svg")
+                .attr("width", "800")
+                .attr("height", "600");
+
+      var textGroup = vis.append("g")
+      var text = textGroup.append("text")
+                  .attr("x", 30)
+                  .attr("y", 30)
+                  .text("Current iteration: 1")
+                  .attr("font-family", "sans-serif")
+                  .attr("font-size", "18px");
+                
+
+      var circleGroup = vis.append("g");
+
+      var circles = circleGroup.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; })
+                .attr("r", 5);
+
+
+      // Initialise the centroids
+
+      var centroids = [];
+      function initialiseCentroids() {
+        centroids = [];
+        var pmap = {};
+        for (var i = 0; i < numGroups; i++) {
+          var p = Math.floor(Math.random() * numGroups * numPoints);
+          while (typeof(pmap[p]) != 'undefined') {
+            p = Math.floor(Math.random() * numGroups * numPoints);
+          }
+          pmap[p] = 1;
+          var centroid = { "x" : data[p].x, "y" : data[p].y, "c" : colours[i] };
+          centroids.push(centroid);
+        }
+      }
+
+      initialiseCentroids();
+      
+      // Draw the centroids
+      var centroidGroup = vis.append("g");
+
+      var markers = centroidGroup.selectAll("circle")
+                .data(centroids)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; })
+                .attr("r", 10)
+                .style("fill", function(d) { return d.c; })
+                .style("stroke", "black")
+                .style("stroke-width", 3)
+
+      var counter = 0;
+
+      function prepareCentroids() {
+        for (var i = 0; i < numGroups; i++) {
+          centroids[i].sumX = centroids[i].sumY = centroids[i].numPoints = 0;
+          centroids[i].cost = 0;
+        }
+      }
+
+      function getCentroidDistance(i, d) {
+          var xs = d.x - centroids[i].x;
+          var ys = d.y - centroids[i].y;
+          var dist = xs * xs + ys * ys;
+          return dist;
+      }
+
+      function updateCostFunction(i, d, dist) {
+        centroids[i].sumX += d.x;
+        centroids[i].sumY += d.y;
+        centroids[i].numPoints++;
+        centroids[i].cost += dist;
+      }
+
+      function updateClosestCentroids(d) {
+          var bestIdx = 0;
+          var smallestDist = getCentroidDistance(0, d);
+          for (var i = 1; i < numGroups; i++) {
+            var dist = getCentroidDistance(i, d);
+            if (dist < smallestDist) {
+              bestIdx = i;
+              smallestDist = dist;
+            }
+          }
+          
+          updateCostFunction(bestIdx, d, smallestDist);
+          return centroids[bestIdx].c;
+      }
+
+      var bestCost = {};
+
+      function storeCentroidCost() {
+        var cost = 0;
+        for (var i = 0; i < centroids.length; i++) {
+          cost += centroids[i].cost;
+        }
+        if (typeof(bestCost['cost']) == 'undefined') {
+          bestCost['cost'] = cost;
+          bestCost['centroids'] = centroids;
+        } else if (bestCost['cost'] > cost) {
+          console.log("Found a better cost function in iteration " + currentIteration);
+          bestCost['cost'] = cost;
+          bestCost['centroids'] = centroids;
+        }
+      }
+
+      function update() {
+
+        prepareCentroids();
+
+        var change = circleGroup.selectAll("circle")
+                      .data(data)
+                      .style("fill", function(d) { return updateClosestCentroids(d) });
+            
+        var centroidChange = centroidGroup.selectAll("circle")
+                      .data(centroids)
+                      .transition()
+                      .duration(1000)
+                      .attr("cx", function(d) { d.x = Math.floor(d.sumX / d.numPoints); return d.x; })
+                      .attr("cy", function(d) { d.y = Math.floor(d.sumY / d.numPoints); return d.y; });
+        counter++;
+        if (counter > 10) {
+          counter = 0;
+          currentIteration++;
+          // record the current cost function for this centroid set
+          storeCentroidCost();
+
+          if (currentIteration < numIterations) {
+            
+            initialiseCentroids();
+            // update text
+            textGroup.select("text")
+              .text("Current iteration: " + (currentIteration+1));
+
+            // redraw centroids
+            centroidGroup.selectAll("circle").data(centroids)
+                .transition()
+                .duration(300)
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; });
+             
+            // redraw points
+            circleGroup.selectAll("circle").data(data)
+                .style("fill", "black");
+ 
+            setTimeout(update, 2000);
+          }
+        } else {
+          setTimeout(update, 2000);
+        }
+      }
+
+      setTimeout(update, 2000);
+
+    </script>
+
+  </body>
+</html>

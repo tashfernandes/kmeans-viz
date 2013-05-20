@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>K-Means Visualisation</title>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <script src="d3.min.js" charset="utf-8"></script>
+    <script>
+      var numPoints = 50;
+      var ranges = [
+        { "x" : {"min": 50, "max": 500},
+          "y" : {"min": 50, "max": 280}
+        },
+        { "x" : {"min": 360, "max": 745},
+          "y" : {"min": 180, "max":403}
+        }
+      ]; 
+
+      var centroids = [
+        { "x" : 600, "y": 60, "c" : "red", "sumX" : 0, "sumY" : 0, "numPoints" : 0 },
+        { "x" : 75, "y": 380, "c" : "blue", "sumX" : 0, "sumY" : 0, "numPoints" : 0 }
+      ];
+      
+      var numGroups = 2;
+      var data = [];
+
+      for (var w = 0; w < 2; w++) {
+        var xDiff = ranges[w].x.max - ranges[w].x.min;
+        var yDiff = ranges[w].y.max - ranges[w].y.min;
+      
+        for (var i = 0; i < numPoints; i++) {
+          var x = Math.floor(Math.random() * xDiff) + ranges[w].x.min;
+          var y = Math.floor(Math.random() * yDiff) + ranges[w].y.min;
+          elt = { "x" : x, "y": y, "c" : ranges[w].c};
+          data.push(elt);
+        }
+      }
+
+      var vis = d3.select("body")
+                .append("svg")
+                .attr("width", "800")
+                .attr("height", "600");
+
+      var circleGroup = vis.append("g");
+
+      var circles = circleGroup.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; })
+                .attr("r", 5);
+
+      var centroidGroup = vis.append("g");
+
+      var markers = centroidGroup.selectAll("circle")
+                .data(centroids)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; })
+                .attr("r", 10)
+                .style("fill", function(d) { return d.c; })
+                .style("stroke", "black")
+                .style("stroke-width", 3)
+
+      var counter = 0;
+
+      function update() {
+
+        var change = circleGroup.selectAll("circle").data(data);
+
+        centroids[0].sumX = centroids[0].sumY = centroids[0].numPoints = 0;
+        centroids[1].sumX = centroids[1].sumY = centroids[1].numPoints = 0;
+
+        change.transition().style("fill", function(d) {
+          var xs = d.x - centroids[0].x;
+          var ys = d.y - centroids[0].y;
+          var d1 = xs * xs + ys * ys;
+
+          var xs = d.x - centroids[1].x;
+          var ys = d.y - centroids[1].y;
+          var d2 = xs * xs + ys * ys;
+
+          if (d1 < d2) {
+            centroids[0].sumX += d.x;
+            centroids[0].sumY += d.y;
+            centroids[0].numPoints++;
+            return centroids[0].c;
+          }
+          centroids[1].sumX += d.x;
+          centroids[1].sumY += d.y;
+          centroids[1].numPoints++;
+          return centroids[1].c;
+        });
+
+        var centroidChange = centroidGroup.selectAll("circle").data(centroids);
+        centroidChange.transition()
+          .attr("cx", function(d) { 
+            d.x = Math.floor(d.sumX / d.numPoints);
+            return d.x;})
+          .attr("cy", function(d) { 
+            d.y = Math.floor(d.sumY / d.numPoints);
+            return d.y; });
+
+        counter++;
+        if (counter < 8) {
+          setTimeout(update, 2000);
+        }
+      }
+
+      setTimeout(update, 2000);
+
+    </script>
+
+  </body>
+</html>
